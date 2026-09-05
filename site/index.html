@@ -1,6 +1,39 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>transfer-calc</title>
+<style>
+  body { font: 17px/1.5 system-ui, sans-serif; margin: 0 auto; padding: 1.2rem; max-width: 34rem; }
+  h1 { font-size: 1.4rem; margin-bottom: .2rem; }
+  h2 { font-size: 1.1rem; margin-top: 1.6rem; }
+  pre { background: #f2f2f2; padding: .8rem; border-radius: .4rem; white-space: pre-wrap;
+        word-break: break-word; font: 15px/1.45 ui-monospace, monospace; }
+  .ok { background: #e3f5e3; }
+  .no { background: #fbe3e3; }
+  p.hint { color: #555; font-size: .92rem; }
+</style>
+
 <h1>transfer-calc</h1>
-<p>Заглушка. Нужна, чтобы проверить HTTPS от Let's Encrypt до того, как написан калькулятор.
-Caddy раздаёт эту папку; корень репозитория наружу не смотрит.</p>
+<p>Заглушка. Нужна, чтобы проверить HTTPS от Let&rsquo;s Encrypt до того, как написан
+калькулятор. Caddy раздаёт эту папку; корень репозитория наружу не смотрит.</p>
+
+<h2>Service worker</h2>
+<pre id="sw">проверяю…</pre>
+<p class="hint">Если тут «зарегистрирован» — офлайн-режим в кассе перестал быть
+предположением. Проверить целиком: выключить мобильный интернет и Wi-Fi и обновить
+страницу — она обязана открыться.</p>
+
+<script>
+  var out = document.getElementById('sw');
+  function say(text, cls) { out.textContent = text; out.className = cls; }
+  var base = 'isSecureContext = ' + window.isSecureContext + '\norigin = ' + location.origin;
+
+  if (!('serviceWorker' in navigator)) {
+    say('НЕТ: navigator.serviceWorker отсутствует\n' + base, 'no');
+  } else {
+    navigator.serviceWorker.register('./sw.js').then(
+      function (reg) { say('ДА: зарегистрирован\nscope = ' + reg.scope + '\n' + base, 'ok'); },
+      function (err) { say('НЕТ: register отвергнут\n' + err.name + ': ' + err.message + '\n' + base, 'no'); }
+    );
+  }
+</script>
