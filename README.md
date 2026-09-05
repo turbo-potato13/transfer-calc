@@ -26,7 +26,7 @@
 
 ## Куда это едет
 
-Статика на бесплатном Oracle Cloud: cron-скрипт раз в N минут пишет `rates.json`,
+Статика на бесплатном Oracle Cloud: cron-скрипт раз в сутки пишет `rates.json`,
 Caddy раздаёт `site/` по HTTPS. Без долгоживущего backend — на машине 1 ГБ памяти,
 делится с другим сервисом. Подробности и обоснование —
 [Где живёт приложение](Docs/Wayfinder/Tickets/where-the-app-lives.md).
