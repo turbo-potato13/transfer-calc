@@ -7,6 +7,7 @@ SERVER.md
 # Генерируется cron на сервере — в репозитории ему делать нечего,
 # иначе он подрался бы с git pull --ff-only.
 site/rates.json
+rates.log
 
 # Служебное
 *.bak
