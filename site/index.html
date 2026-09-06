@@ -1,39 +1,519 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>transfer-calc</title>
+<meta name="theme-color" content="#1b1d21">
+<title>Вывод денег</title>
+
 <style>
-  body { font: 17px/1.5 system-ui, sans-serif; margin: 0 auto; padding: 1.2rem; max-width: 34rem; }
-  h1 { font-size: 1.4rem; margin-bottom: .2rem; }
-  h2 { font-size: 1.1rem; margin-top: 1.6rem; }
-  pre { background: #f2f2f2; padding: .8rem; border-radius: .4rem; white-space: pre-wrap;
-        word-break: break-word; font: 15px/1.45 ui-monospace, monospace; }
-  .ok { background: #e3f5e3; }
-  .no { background: #fbe3e3; }
-  p.hint { color: #555; font-size: .92rem; }
+  :root {
+    --bg: #f6f6f4;  --card: #fff;   --ink: #1b1d21;  --dim: #6b6f76;
+    --line: #dcdcd6; --hot: #fff8e1; --hotline: #e8c86a;
+    --good: #1a7f37; --warn: #9a6700; --bad: #b42318; --blue: #0b5ed7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c; --card: #1f2227; --ink: #e8e9ea; --dim: #9aa0a8;
+      --line: #333840; --hot: #2b2718; --hotline: #7a6526;
+      --good: #4ac26b; --warn: #d4a72c; --bad: #ff7b72; --blue: #6ea8fe;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 12px 12px 40px; max-width: 30rem;
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  h2 { font-size: .8rem; font-weight: 600; text-transform: uppercase;
+       letter-spacing: .04em; color: var(--dim); margin: 18px 0 6px; }
+  .card { background: var(--card); border: 1px solid var(--line);
+          border-radius: 10px; padding: 10px; }
+
+  /* --- сумма --- */
+  .amount { display: flex; align-items: baseline; gap: 8px; }
+  .amount label { font-size: .9rem; color: var(--dim); flex: 1; }
+  input {
+    font: inherit; color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+    min-height: 44px; width: 100%; text-align: right;
+  }
+  input:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  #send { font-size: 1.3rem; font-weight: 600; }
+  .paid { color: var(--dim); font-size: .85rem; margin-top: 6px; }
+
+  /* --- ряды банков --- */
+  .banks { display: flex; gap: 6px; margin-top: 4px; }
+  .banks button {
+    flex: 1; min-height: 44px; padding: 6px 4px; font: inherit; font-size: .84rem;
+    color: var(--ink); background: var(--card); cursor: pointer;
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .banks button[aria-pressed="true"] { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+  .banks button .mark { display: block; font-size: .7rem; color: var(--warn); }
+  .banks button:disabled { opacity: .45; cursor: default; }
+
+  /* --- горячие курсы --- */
+  .hot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hot .field { display: flex; flex-direction: column; gap: 3px; }
+  .hot label { font-size: .78rem; color: var(--dim); }
+  .hot input { background: var(--hot); border-color: var(--hotline); }
+  .status { margin-top: 8px; font-size: .8rem; color: var(--dim);
+            width: 100%; text-align: left; background: none; border: 0;
+            padding: 4px 0; cursor: pointer; }
+  .status.stale { color: var(--warn); }
+  .status.off { color: var(--bad); }
+  #diag { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+          white-space: pre-wrap; word-break: break-word; color: var(--dim);
+          margin-top: 6px; }
+
+  /* --- результаты --- */
+  .out { width: 100%; text-align: left; background: var(--card); cursor: pointer;
+         border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+         margin-bottom: 8px; color: var(--ink); font: inherit; }
+  .out .top { display: flex; align-items: baseline; gap: 8px; }
+  .out .cur { font-size: .82rem; color: var(--dim); width: 3.2rem; }
+  .out .got { font-size: 1.45rem; font-weight: 600; flex: 1; }
+  .out .loss { font-size: .85rem; color: var(--dim); text-align: right; }
+  .out .best { color: var(--good); font-weight: 600; }
+  .steps { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px;
+           font-size: .82rem; }
+  .steps div { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  .steps .sum { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 4px;
+                font-weight: 600; }
+  .steps .chk { color: var(--dim); font-size: .75rem; }
+  .steps .chk.bad { color: var(--bad); }
+
+  /* --- свёрнутое --- */
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-size: .85rem; color: var(--dim); padding: 6px 0; }
+  .official { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 10px;
+              font-size: .82rem; align-items: center; }
+  .official input { min-height: 32px; padding: 4px 6px; font-size: .82rem; width: 6.5rem; }
+  .official .head { color: var(--dim); font-size: .72rem; }
+  .back { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px;
+          align-items: center; font-size: .88rem; }
+  .back input { min-height: 38px; width: 7rem; }
+  .back .res { color: var(--dim); font-size: .82rem; text-align: right; }
+  .note { color: var(--dim); font-size: .78rem; margin-top: 8px; }
 </style>
 
-<h1>transfer-calc</h1>
-<p>Заглушка. Нужна, чтобы проверить HTTPS от Let&rsquo;s Encrypt до того, как написан
-калькулятор. Caddy раздаёт эту папку; корень репозитория наружу не смотрит.</p>
+<div class="card">
+  <div class="amount">
+    <label for="send">Сумма к выдаче, ₽</label>
+  </div>
+  <input id="send" inputmode="decimal" value="50000">
+  <div class="paid" id="paid"></div>
+</div>
 
-<h2>Service worker</h2>
-<pre id="sw">проверяю…</pre>
-<p class="hint">Если тут «зарегистрирован» — офлайн-режим в кассе перестал быть
-предположением. Проверить целиком: выключить мобильный интернет и Wi-Fi и обновить
-страницу — она обязана открыться.</p>
+<h2>Где забрать</h2>
+<div class="banks" id="banks-out"></div>
+
+<h2>Где менять</h2>
+<div class="banks" id="banks-ex"></div>
+
+<h2>Курс на табло</h2>
+<div class="card">
+  <div class="hot">
+    <div class="field">
+      <label for="buyRub">покупают ₽</label>
+      <input id="buyRub" inputmode="decimal" data-hot="buyRub">
+    </div>
+    <div class="field">
+      <label for="sEUR">продают €</label>
+      <input id="sEUR" inputmode="decimal" data-hot="EUR">
+    </div>
+    <div class="field">
+      <label for="sMDL">продают лей</label>
+      <input id="sMDL" inputmode="decimal" data-hot="MDL">
+    </div>
+    <div class="field">
+      <label for="sUSD">продают $</label>
+      <input id="sUSD" inputmode="decimal" data-hot="USD">
+    </div>
+  </div>
+  <button class="status" id="status" type="button"></button>
+  <div id="diag" hidden></div>
+</div>
+
+<h2>Получаешь</h2>
+<div id="results"></div>
+
+<details id="off-block">
+  <summary>Официальные курсы — для разбора потери</summary>
+  <div class="card official" id="official"></div>
+</details>
+
+<details>
+  <summary>Обратный расчёт — нужна конкретная сумма на руки</summary>
+  <div class="card back" id="back"></div>
+</details>
+
+<p class="note" id="note"></p>
 
 <script>
-  var out = document.getElementById('sw');
-  function say(text, cls) { out.textContent = text; out.className = cls; }
-  var base = 'isSecureContext = ' + window.isSecureContext + '\norigin = ' + location.origin;
+/* Формула — построчный перенос разделов 2–4 листа «Калькулятор» из
+   «Калькулятор перевода.xlsx». Ссылки на ячейки в комментариях: файл остаётся
+   источником истины, и расхождение с ним — ошибка здесь, а не там. */
 
-  if (!('serviceWorker' in navigator)) {
-    say('НЕТ: navigator.serviceWorker отсутствует\n' + base, 'no');
-  } else {
-    navigator.serviceWorker.register('./sw.js').then(
-      function (reg) { say('ДА: зарегистрирован\nscope = ' + reg.scope + '\n' + base, 'ok'); },
-      function (err) { say('НЕТ: register отвергнут\n' + err.name + ': ' + err.message + '\n' + base, 'no'); }
-    );
+var CUR = [
+  { code: 'EUR', name: 'евро', sign: '€',   field: 'sEUR' },
+  { code: 'MDL', name: 'лей',  sign: 'лей', field: 'sMDL' },
+  { code: 'USD', name: 'доллар', sign: '$', field: 'sUSD' }
+];
+var BANKS = [
+  { key: 'prisbank',     name: 'Сбербанк' },
+  { key: 'agroprombank', name: 'Агропромбанк' },
+  { key: 'eximbank',     name: 'Эксимбанк' }
+];
+var FEE = 0.01, FEE_MIN = 50;   // B6, B7 — 1% с карты обычного банка, минимум 50 ₽
+
+var rates = null;               // разобранный rates.json
+var fromCache = false;          // страница открыта без сети
+var payout = 'prisbank';        // банк выдачи   — первое плечо
+var exchange = 'prisbank';      // банк обмена   — второе плечо
+var open_ = {};                 // какие строки валют раскрыты
+var manual = {};                // перебитые руками поля; не переживают перезагрузку
+var swState = 'не пробовали';   // на нём висит весь офлайн, поэтому отказ не молчит
+
+/* --- числа ---------------------------------------------------------------- */
+
+function parse(text) {
+  var n = parseFloat(String(text == null ? '' : text).replace(/\s/g, '').replace(',', '.'));
+  return isFinite(n) ? n : NaN;
+}
+function fmt(n, digits) {
+  if (!isFinite(n)) return '—';
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+function money(n) { return fmt(n, 2); }
+function rub(n) { return fmt(Math.round(n), 0); }
+
+/* --- курсы ---------------------------------------------------------------- */
+
+function cash(bank) {
+  var node = rates && rates.sources && rates.sources.cash && rates.sources.cash[bank];
+  return node && node.rates ? node : null;
+}
+function official(which) {
+  var node = rates && rates.sources && rates.sources[which];
+  return node && node.rates ? node : null;
+}
+/* Что стоит в поле: перебитое руками, иначе автоматическое. */
+function hot(name) {
+  if (manual[name] !== undefined) return manual[name];
+  return auto(name);
+}
+function auto(name) {
+  if (name === 'buyRub') {
+    var c = cash(payout);
+    return c ? c.rates.RUB.buy : NaN;                    // B8
   }
+  var e = cash(exchange);
+  return e ? e.rates[name].sale : NaN;                   // B13
+}
+function cold(name) {
+  if (manual[name] !== undefined) return manual[name];
+  var prb = official('prb'), nbm = official('nbm');
+  if (name === 'prbRub') return prb ? prb.rates.RUB : NaN;   // B9
+  if (name === 'nbmRub') return nbm ? nbm.rates.RUB : NaN;   // B10
+  if (name.indexOf('prb') === 0) return prb ? prb.rates[name.slice(3)] : NaN;  // B14
+  if (name.indexOf('nbm') === 0) return nbm ? nbm.rates[name.slice(3)] : NaN;  // B15
+  return NaN;
+}
+
+/* --- расчёт --------------------------------------------------------------- */
+
+function compute() {
+  var S = parse(document.getElementById('send').value);      // B18
+  var fee = isFinite(S) ? Math.max(S * FEE, FEE_MIN) : NaN;  // B19
+  var total = S + fee;                                       // B20
+  var buyRub = hot('buyRub');
+  var rup = S * buyRub;                                      // B21
+  var nbmRub = cold('nbmRub'), prbRub = cold('prbRub');
+
+  var rows = CUR.map(function (c) {
+    var sale = hot(c.code);                                  // B13
+    var nbm = cold('nbm' + c.code);                          // B15
+    var prb = cold('prb' + c.code);                          // B14
+    var got = rup / sale;                                    // B24
+    var ideal = total * nbmRub / nbm;                        // B25
+    var loss = ideal - got;                                  // B26
+    var lossRub = loss * nbm / nbmRub;                       // B27
+    var k = nbm / nbmRub;   // множитель «валюта -> рубли РФ», общий для четырёх шагов
+    var steps = [
+      ['Комиссия Юнистрима', fee],                                        // B34
+      ['Разрыв офиц. курсов ПМР и Молдовы', (S * nbmRub / nbm - S * prbRub / prb) * k], // B35
+      ['Спред банка на покупке ₽', S * (prbRub - buyRub) / prb * k],      // B36
+      ['Спред банка на продаже валюты', (rup / prb - rup / sale) * k]     // B37
+    ];
+    var sum = steps.reduce(function (a, s) { return a + s[1]; }, 0);      // B38
+    return {
+      cur: c, got: got, ideal: ideal, loss: loss, lossRub: lossRub,
+      share: loss / ideal,                                   // B28
+      eff: total / got,                                      // B29
+      steps: steps, sum: sum, check: sum - lossRub           // B39 — обязан быть 0
+    };
+  });
+  return { S: S, fee: fee, total: total, rup: rup, rows: rows };
+}
+
+/* --- отрисовка ------------------------------------------------------------ */
+
+function drawBanks() {
+  drawRow('banks-out', 'payout');
+  drawRow('banks-ex', 'exchange');
+}
+
+/* Просто три банка на выбор, всегда в одном порядке. Ни топа, ни сортировки по
+   выгоде: числа видно, перебирая клавиши, а переставляющийся ряд заставлял бы
+   каждый раз искать нужный банк заново. Пометка остаётся одна — про доверие к
+   самому числу, а не про то, где выгоднее. */
+function drawRow(id, leg) {
+  var box = document.getElementById(id);
+  box.innerHTML = '';
+  BANKS.forEach(function (bank) {
+    var node = cash(bank.key);
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.setAttribute('aria-pressed',
+      (leg === 'payout' ? payout : exchange) === bank.key ? 'true' : 'false');
+    var mark = '';
+    if (!node) { mark = 'нет курса'; el.disabled = true; }
+    else if (node.disputed) mark = 'спорный';   // агрегаторы разошлись, см. rates.json
+    el.innerHTML = '<span>' + bank.name + '</span><span class="mark">' + mark + '</span>';
+    el.onclick = function () {
+      if (leg === 'payout') payout = bank.key; else exchange = bank.key;
+      draw();
+    };
+    box.appendChild(el);
+  });
+}
+
+function drawHot() {
+  document.querySelectorAll('[data-hot]').forEach(function (el) {
+    var name = el.dataset.hot;
+    var value = auto(name);
+    el.placeholder = isFinite(value) ? String(value) : 'введи курс';
+    if (manual[name] === undefined && document.activeElement !== el) el.value = '';
+  });
+}
+
+/* Одна строка на оба сценария: «держится с 27.08 · проверено 8:05», жёлтая после
+   суток, «Нет сети» на кеше. Расчёт не блокируется никогда. */
+function drawStatus() {
+  var el = document.getElementById('status');
+  var out = cash(payout), ex = cash(exchange);
+  var node = (out && ex && out.fetched_at < ex.fetched_at) ? out : (ex || out);
+  var parts = [], cls = '';
+
+  if (!node) {
+    parts.push('Курсов нет — введи с табло');
+    cls = 'off';
+  } else {
+    if (node.changed_at) parts.push('держится с ' + short(node.changed_at));
+    if (node.fetched_at) {
+      var age = (Date.now() - Date.parse(node.fetched_at)) / 3600e3;
+      parts.push('проверено ' + clock(node.fetched_at));
+      if (age > 24) cls = 'stale';
+    }
+    if (!node.ok) { parts.push('источник не ответил'); cls = 'stale'; }
+  }
+  if (fromCache) { parts.unshift('Нет сети'); cls = 'off'; }
+  el.textContent = parts.join(' · ');
+  el.className = 'status ' + cls;
+}
+
+function short(iso) {
+  var p = String(iso).split('-');
+  return p.length === 3 ? p[2] + '.' + p[1] : iso;
+}
+function clock(iso) {
+  var d = new Date(iso);
+  return isFinite(d) ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—';
+}
+
+function drawDiag() {
+  var box = document.getElementById('diag');
+  var lines = [];
+  ['cash.prisbank', 'cash.agroprombank', 'cash.eximbank', 'prb', 'nbm'].forEach(function (path) {
+    var node = path.split('.').reduce(function (n, k) { return n && n[k]; },
+                                      rates && rates.sources);
+    if (!node) { lines.push(path + ': нет в файле'); return; }
+    lines.push(path + ': ' + (node.ok ? 'ok' : 'ОТКАЗ') +
+      (node.error ? ' ' + node.error : '') +
+      ' fetched_at=' + (node.fetched_at || '—') +
+      ' changed_at=' + (node.changed_at || '—') +
+      (node.cross_check ? '\n    ' + node.cross_check : ''));
+  });
+  if (rates && rates.generated_at) lines.push('generated_at=' + rates.generated_at);
+  lines.push('service worker: ' + swState);
+  box.textContent = lines.join('\n');
+}
+
+function drawResults(calc) {
+  var box = document.getElementById('results');
+  var best = Math.min.apply(null, calc.rows.map(function (r) {
+    return isFinite(r.share) ? r.share : Infinity;
+  }));
+  box.innerHTML = '';
+  calc.rows.forEach(function (r) {
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'out';
+    var head =
+      '<div class="top">' +
+        '<span class="cur">' + r.cur.name + '</span>' +
+        '<span class="got">' + money(r.got) + ' ' + r.cur.sign + '</span>' +
+        '<span class="loss' + (r.share === best ? ' best' : '') + '">−' +
+          fmt(r.share * 100, 1) + ' %</span>' +
+      '</div>';
+    var body = '';
+    if (open_[r.cur.code]) {
+      body = '<div class="steps">' +
+        r.steps.map(function (s) {
+          return '<div><span>' + s[0] + '</span><span>' + rub(s[1]) + ' ₽</span></div>';
+        }).join('') +
+        '<div class="sum"><span>Итого потеря</span><span>' + rub(r.sum) + ' ₽</span></div>' +
+        '<div><span>Было бы по курсу НБМ</span><span>' + money(r.ideal) + ' ' + r.cur.sign + '</span></div>' +
+        '<div><span>Эффективный курс</span><span>' + money(r.eff) + ' ₽ за 1</span></div>' +
+        '<div class="chk' + (Math.abs(r.check) > 0.5 ? ' bad' : '') + '"><span>Сходимость</span><span>' +
+          fmt(r.check, 2) + ' ₽</span></div>' +
+      '</div>';
+    }
+    el.innerHTML = head + body;
+    el.onclick = function () { open_[r.cur.code] = !open_[r.cur.code]; draw(); };
+    box.appendChild(el);
+  });
+}
+
+/* Свёрнутые блоки строятся один раз. Перерисовывать их целиком нельзя: поле,
+   в которое сейчас печатают, пересоздалось бы на каждой цифре и потеряло фокус. */
+function buildOfficial() {
+  var box = document.getElementById('official');
+  var rows = [['prbRub', 'ПРБ, ПМР-руб за 1 ₽'], ['nbmRub', 'НБМ, лей за 1 ₽']];
+  CUR.forEach(function (c) {
+    rows.push(['prb' + c.code, 'ПРБ, ПМР-руб за 1 ' + c.sign]);
+    rows.push(['nbm' + c.code, 'НБМ, лей за 1 ' + c.sign]);
+  });
+  box.innerHTML = '<span class="head">курс</span><span class="head">значение</span><span></span>';
+  rows.forEach(function (r) {
+    box.insertAdjacentHTML('beforeend',
+      '<span>' + r[1] + '</span>' +
+      '<input inputmode="decimal" data-cold="' + r[0] + '"><span></span>');
+  });
+  box.querySelectorAll('[data-cold]').forEach(function (el) {
+    el.oninput = function () { setManual(el.dataset.cold, el.value); };
+  });
+}
+
+function drawOfficial() {
+  document.querySelectorAll('[data-cold]').forEach(function (el) {
+    var value = cold(el.dataset.cold);
+    el.placeholder = isFinite(value) ? String(value) : '—';
+  });
+}
+
+function buildBack() {
+  var box = document.getElementById('back');
+  box.innerHTML = '';
+  CUR.forEach(function (c) {
+    box.insertAdjacentHTML('beforeend',
+      '<span>хочу ' + c.name + '</span>' +
+      '<input inputmode="decimal" data-want="' + c.code + '">' +
+      '<span class="res" data-pay="' + c.code + '"></span>' +
+      '<span class="res" data-out="' + c.code + '"></span>');
+  });
+  box.querySelectorAll('[data-want]').forEach(function (el) {
+    el.oninput = function () { manual['want' + el.dataset.want] = el.value; draw(); };
+  });
+}
+
+function drawBack() {
+  CUR.forEach(function (c) {
+    var want = parse(manual['want' + c.code]);
+    var need = want * hot(c.code);                       // B46
+    var out = need / hot('buyRub');                      // B47
+    var pay = out + Math.max(out * FEE, FEE_MIN);        // B48
+    document.querySelector('[data-pay="' + c.code + '"]').textContent =
+      isFinite(pay) ? 'заплатить ' + rub(pay) + ' ₽' : '';
+    document.querySelector('[data-out="' + c.code + '"]').textContent =
+      isFinite(out) ? 'к выдаче ' + rub(out) + ' ₽' : '';
+  });
+}
+
+function draw() {
+  var calc = compute();
+  document.getElementById('paid').textContent = isFinite(calc.total)
+    ? 'комиссия ' + rub(calc.fee) + ' ₽ · с карты спишется ' + rub(calc.total) +
+      ' ₽ · на руки ' + rub(calc.rup) + ' ПМР-руб'
+    : 'введи сумму';
+  drawBanks();
+  drawHot();
+  drawStatus();
+  drawDiag();
+  drawResults(calc);
+  drawOfficial();
+  drawBack();
+}
+
+/* --- ввод ----------------------------------------------------------------- */
+
+function setManual(name, text) {
+  if (String(text).trim() === '') delete manual[name];
+  else {
+    var n = parse(text);
+    if (isFinite(n)) manual[name] = n; else delete manual[name];
+  }
+  draw();
+}
+
+document.getElementById('send').oninput = draw;
+document.querySelectorAll('[data-hot]').forEach(function (el) {
+  el.oninput = function () { setManual(el.dataset.hot, el.value); };
+});
+document.getElementById('status').onclick = function () {
+  var box = document.getElementById('diag');
+  box.hidden = !box.hidden;
+};
+
+buildOfficial();
+buildBack();
+
+/* --- загрузка ------------------------------------------------------------- */
+
+/* Страница читает только rates.json со своего origin и больше никуда не ходит. */
+fetch('./rates.json', { cache: 'no-cache' })
+  .then(function (r) {
+    fromCache = !!r.headers.get('x-from-cache');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .catch(function () {
+    fromCache = true;
+    if (!('caches' in window)) return null;
+    return caches.match('./rates.json')
+      .then(function (hit) { return hit ? hit.json() : null; })
+      .catch(function () { return null; });
+  })
+  .then(function (doc) {
+    rates = doc;
+    document.getElementById('note').textContent = doc
+      ? 'Курс в кассе может отличаться от опубликованного — вбей то, что видишь на табло. Перебитые поля не переживают следующее открытие.'
+      : 'Курсы не загрузились. Все поля вводятся руками — калькулятор работает целиком.';
+    draw();
+  });
+
+draw();
+
+/* Без воркера офлайн в кассе не работает, а отказ register() ничего не ломает
+   видимо — поэтому он пишется в панель диагностики, а не проглатывается. */
+if ('serviceWorker' in navigator) {
+  swState = 'регистрируется';
+  navigator.serviceWorker.register('./sw.js').then(
+    function (reg) { swState = 'зарегистрирован, scope ' + reg.scope; drawDiag(); },
+    function (err) { swState = 'ОТКАЗ ' + err.name + ': ' + err.message; drawDiag(); }
+  );
+} else {
+  swState = 'недоступен в этом браузере';
+}
 </script>
