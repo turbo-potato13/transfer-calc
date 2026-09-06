@@ -34,6 +34,8 @@
 
 - TLS перехватывается антивирусом: `curl` к https требует `--ssl-no-revoke`, `pip install` требует `--trusted-host pypi.org --trusted-host files.pythonhosted.org`.
 - LibreOffice нет, поэтому `recalc.py` из скилла `xlsx` не работает. Пересчёт и проверка xlsx — через Excel COM из PowerShell (`CalculateFullRebuild()`, затем обход `UsedRange` в поисках ячеек, чей `.Text` начинается с `#`).
+- **Xlsx нельзя сохранять из Excel.** При сохранении Excel вписывает в `xl/workbook.xml` абсолютный путь к файлу вместе с именем пользователя Windows и подменяет `cp:lastModifiedBy`. Репозиторий публичный, история git необратима. Открывать только на чтение (`Workbooks.Open($path, 0, $true)`, закрывать `Close($false)`); правки текста делать заменой строк в `xl/sharedStrings.xml` при перепаковке zip. Сейчас в файле стоит `creator: openpyxl`, `lastModifiedBy: turbo-potato13` и никакого `absPath`.
+- Читать xlsx можно и без Excel: `openpyxl` с `data_only=True` отдаёт закешированные значения формул. Excel нужен только чтобы **пересчитать** файл на других входах.
 - В `.ps1` нельзя писать кириллицу: PowerShell 5.1 читает файл как ANSI. К листам обращаться по индексу, не по имени.
 
 ## Границы
